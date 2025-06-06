@@ -84,6 +84,12 @@ def snell_refraction_direction(v_in, n1, n2, normal):
     return v_out / np.linalg.norm(v_out)
 
 
+def reflect_direction(v_in, normal):
+    v = v_in / np.linalg.norm(v_in)
+    n_hat = normal / np.linalg.norm(normal)
+    return v - 2 * np.dot(v, n_hat) * n_hat
+
+
 def intersect_with_hypotenuse(p0, v, h):
     x0, y0 = p0
     vx, vy = v
@@ -125,34 +131,61 @@ ax.plot([start_point[0], entry_point[0]], [start_point[1], entry_point[1]],
 
 normal_in = np.array([1.0, 0.0])
 
+# Учет угла Брюстера
+theta_B_deg = np.degrees(np.arctan(n_550))
+
 # Градиентное построение лучей
 for i, wl in enumerate(wavelengths_nm):
     n = n_values[i]
     color = cmap(norm(wl))
 
     v_incident = np.array([np.cos(angle_inc_rad), np.sin(angle_inc_rad)])
+
+    theta_B = np.degrees(np.arctan(n))
+
+    if angle_inc_deg >= theta_B - 1e-6:
+        v_reflected = reflect_direction(v_incident, normal_in)
+        reflected_end = entry_point + v_reflected * 5.0
+
+        ax.plot([start_point[0], entry_point[0]],
+                [start_point[1], entry_point[1]],
+                color='black', linestyle=':', linewidth=0.8)
+
+        ax.plot([entry_point[0], reflected_end[0]],
+                [entry_point[1], reflected_end[1]],
+                color=color, linewidth=2.0)
+        continue
+
     v_inside = snell_refraction_direction(v_incident, 1.0, n, normal_in)
     if v_inside is None:
         continue
 
-    result = intersect_with_hypotenuse(entry_point, v_inside, h)
-    if result is None:
+    exit_result = intersect_with_hypotenuse(entry_point, v_inside, h)
+    if exit_result is None:
         continue
-
-    exit_point, t_hit = result
-
-
+    exit_point, _ = exit_result
 
     normal_exit = np.array([1.0, 1.0]) / np.sqrt(2)
-    v_out = snell_refraction_direction(v_inside, n, 1.0, normal_exit)
-    if v_out is None:
-        continue
+    theta_crit = np.arcsin(1.0 / n)
 
-    length_out = 3.0
-    out_end = exit_point + v_out * length_out
+    cos_theta = np.dot(v_inside, normal_exit)
+    theta_inside = np.arccos(np.clip(cos_theta, -1, 1))
 
-    ax.plot([entry_point[0], exit_point[0]], [entry_point[1], exit_point[1]], color=color, linewidth=2)
-    ax.plot([exit_point[0], out_end[0]], [exit_point[1], out_end[1]], color=color, linewidth=2)
+    if theta_inside > theta_crit:
+        v_reflected_inside = reflect_direction(v_inside, normal_exit)
+        reflected_end = exit_point + v_reflected_inside * 2.5
+        ax.plot([entry_point[0], exit_point[0]], [entry_point[1], exit_point[1]],
+                color=color, linewidth=1.5)
+        ax.plot([exit_point[0], reflected_end[0]], [exit_point[1], reflected_end[1]],
+                color=color, linewidth=1.5, alpha=0.8)
+    else:
+        v_out = snell_refraction_direction(v_inside, n, 1.0, normal_exit)
+        if v_out is not None:
+            out_end = exit_point + v_out * 4.0
+            ax.plot([entry_point[0], exit_point[0]], [entry_point[1], exit_point[1]],
+                    color=color, linewidth=1.5)
+            ax.plot([exit_point[0], out_end[0]], [exit_point[1], out_end[1]],
+                    color=color, linewidth=1.5)
 
 sm = ScalarMappable(cmap=cmap, norm=norm)
 sm.set_array([])
