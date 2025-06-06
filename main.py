@@ -131,9 +131,6 @@ ax.plot([start_point[0], entry_point[0]], [start_point[1], entry_point[1]],
 
 normal_in = np.array([1.0, 0.0])
 
-# Учет угла Брюстера
-theta_B_deg = np.degrees(np.arctan(n_550))
-
 # Градиентное построение лучей
 for i, wl in enumerate(wavelengths_nm):
     n = n_values[i]
